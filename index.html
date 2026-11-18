@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Quiz nutrition : lequel est le plus calorique ?</title>
+<style>
+  :root{
+    --bg:#f6f4ef; --card:#ffffff; --ink:#1f2421; --muted:#6b706c;
+    --accent:#2f6f4f; --good:#1f9d55; --good-bg:#e3f6ea; --bad:#d64545; --bad-bg:#fde8e8;
+    --line:#e4e1d9; --radius:16px;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--ink);line-height:1.45}
+  .wrap{max-width:720px;margin:0 auto;padding:20px 16px 48px}
+  header{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;gap:12px}
+  header h1{font-size:1.05rem;margin:0;color:var(--accent)}
+  .score{font-weight:700;font-size:.95rem;white-space:nowrap}
+  .progress{height:6px;background:var(--line);border-radius:99px;overflow:hidden;margin-bottom:18px}
+  .progress>div{height:100%;background:var(--accent);width:0;transition:width .3s}
+  .card{background:var(--card);border-radius:var(--radius);padding:20px;box-shadow:0 2px 10px rgba(0,0,0,.05)}
+  .qnum{color:var(--muted);font-size:.85rem;margin:0 0 4px}
+  h2{margin:0 0 4px;font-size:1.3rem}
+  .unit{color:var(--muted);font-size:.9rem;margin:0 0 16px}
+  .choices{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .choice{border:3px solid var(--line);background:#fff;border-radius:14px;padding:0;cursor:pointer;overflow:hidden;text-align:left;font:inherit;color:inherit;transition:transform .1s,border-color .2s}
+  .choice:hover:not(:disabled){transform:translateY(-2px);border-color:var(--accent)}
+  .choice:disabled{cursor:default}
+  .imgbox{aspect-ratio:4/3;background:#eee center/cover no-repeat;display:flex;align-items:center;justify-content:center;font-size:3rem}
+  .cname{padding:10px 12px;font-weight:600;font-size:.95rem;display:flex;justify-content:space-between;gap:6px;align-items:center}
+  .kcal{font-weight:700;font-size:.85rem;padding:2px 8px;border-radius:99px;background:var(--line);display:none;white-space:nowrap}
+  .revealed .kcal{display:inline-block}
+  .choice.correct{border-color:var(--good);background:var(--good-bg)}
+  .choice.correct .kcal{background:var(--good);color:#fff}
+  .choice.wrong{border-color:var(--bad);background:var(--bad-bg)}
+  .choice.wrong .kcal{background:var(--bad);color:#fff}
+  .choice.dim{opacity:.6}
+  .verdict{margin-top:18px;padding:14px 16px;border-radius:12px;font-weight:700;font-size:1.1rem;display:none}
+  .verdict.good{display:block;background:var(--good);color:#fff}
+  .verdict.bad{display:block;background:var(--bad);color:#fff}
+  .feedback{display:none;margin-top:14px}
+  .feedback.show{display:block}
+  .expl{background:#f3f1ea;border-radius:12px;padding:12px 14px;margin:0 0 14px}
+  .rank h3{font-size:.95rem;margin:0 0 8px}
+  .bar{display:grid;grid-template-columns:22px 1fr;gap:8px;align-items:center;margin-bottom:7px;font-size:.9rem}
+  .bar .pos{font-weight:700;color:var(--muted)}
+  .bar .track{background:#f0eee8;border-radius:8px;overflow:hidden;position:relative}
+  .bar .fill{height:30px;background:#cfd8d2;border-radius:8px;transition:width .6s ease}
+  .bar .lbl{position:absolute;left:10px;top:0;height:30px;display:flex;align-items:center;gap:6px;font-weight:600;white-space:nowrap}
+  .bar.first .fill{background:#f2b8a0}
+  .bar.first.low .fill{background:#a9dcb9}
+  .kw-max{color:#c0392b}
+  .kw-min{color:#1f9d55}
+  .tag{font-size:.75rem;font-weight:600;padding:1px 7px;border-radius:99px}
+  .tag.up{background:#fde2c8;color:#8a4b12}
+  .tag.raw{background:#d9efe0;color:#1e6b3c}
+  .btn{display:inline-block;margin-top:16px;background:var(--accent);color:#fff;border:0;border-radius:12px;padding:13px 22px;font:inherit;font-weight:700;cursor:pointer;width:100%}
+  .btn:hover{filter:brightness(1.08)}
+  .center{text-align:center}
+  .big{font-size:3rem;margin:6px 0}
+  .legend{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin:10px 0 4px;font-size:.9rem}
+  .recap{text-align:left;margin-top:16px;padding:0;list-style:none}
+  .recap li{padding:8px 0;border-bottom:1px solid var(--line);font-size:.92rem}
+  .takeaway{text-align:left;background:#f3f1ea;border-radius:12px;padding:14px 16px;margin-top:16px}
+  footer{margin-top:24px;color:var(--muted);font-size:.75rem;text-align:center}
+  footer a{color:var(--muted)}
+  @media (max-width:420px){.cname{font-size:.85rem}.imgbox{font-size:2.4rem}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>🥗 Quiz nutrition</h1>
+    <div class="score" id="score"></div>
+  </header>
+  <div class="progress"><div id="bar"></div></div>
+  <main id="app"></main>
+  <footer>
+    Valeurs approximatives (table Ciqual / étiquettes courantes).
+    Photos : <a href="https://commons.wikimedia.org" target="_blank" rel="noopener">Wikipédia / Wikimedia Commons</a>, licences libres. Clique sur une photo après la réponse pour voir sa source.
+  </footer>
+</div>
+
+<script>
+/* ---------------------------------------------------------------
+   DONNÉES DU QUIZ
+   - k     : kcal (pour 100 g ou 100 ml, sauf indication de l'unité)
+   - up    : true = ultra-transformé 🏭, false = brut / peu transformé 🌱
+   - wiki  : articles Wikipédia dont on prend la photo principale,
+             essayés dans l'ordre ("fr:" = Wikipédia français, sinon anglais)
+   - emoji : affiché si aucune photo n'est trouvée
+---------------------------------------------------------------- */
+const QUESTIONS = [
+  {
+    title: "La pomme de terre sous toutes ses formes",
+    unit: "Pour 100 g",
+    expl: "C'est le même aliment au départ, mais les chips ont presque 7 fois plus de calories que la pomme de terre vapeur : elles sont frites et déshydratées, donc pleines d'huile et très concentrées.",
+    items: [
+      { n: "Chips", k: 540, up: true,  emoji: "🥔", wiki: ["Potato chip"] },
+      { n: "Frites surgelées au four", k: 230, up: true, emoji: "🍟", wiki: ["French fries"] },
+      { n: "Purée maison", k: 90, up: false, emoji: "🥣", wiki: ["Mashed potato"] },
+      { n: "Pomme de terre vapeur", k: 80, up: false, emoji: "🥔", wiki: ["Boiled potatoes", "Potato"] }
+    ]
+  },
+  {
+    title: "Le poulet",
+    unit: "Pour 100 g",
+    expl: "La panure et l'huile de friture doublent les calories du poulet. Le blanc de poulet nature et le poisson blanc sont parmi les protéines les plus légères.",
+    items: [
+      { n: "Nuggets", k: 260, up: true, emoji: "🍗", wiki: ["Chicken nugget"] },
+      { n: "Blanc de poulet", k: 120, up: false, emoji: "🍗", wiki: ["Chicken breast", "Chicken as food"] },
+      { n: "Steak haché 5 %", k: 125, up: false, emoji: "🥩", wiki: ["Ground beef"] },
+      { n: "Cabillaud", k: 80, up: false, emoji: "🐟", wiki: ["Cod as food", "Atlantic cod"] }
+    ]
+  },
+  {
+    title: "La charcuterie",
+    unit: "Pour 100 g",
+    expl: "Le jambon blanc est transformé mais reste léger, environ comme le poulet. Les saucisses de type Strasbourg, c'est surtout du gras et du sel : plus du double de calories.",
+    items: [
+      { n: "Saucisse de Strasbourg", k: 270, up: true, emoji: "🌭", wiki: ["Frankfurter Würstchen", "Vienna sausage"] },
+      { n: "Jambon blanc", k: 110, up: true, emoji: "🥓", wiki: ["fr:Jambon blanc", "Ham"] },
+      { n: "Blanc de poulet", k: 120, up: false, emoji: "🍗", wiki: ["Chicken breast", "Chicken as food"] },
+      { n: "Œuf", k: 140, up: false, emoji: "🥚", wiki: ["Boiled egg", "Egg as food"] }
+    ]
+  },
+  {
+    title: "Le repas du soir",
+    unit: "Pour 100 g",
+    expl: "La pizza surgelée cumule pâte, fromage et matières grasses ajoutées. Les féculents nature sont bien plus légers, surtout la pomme de terre à l'eau, qui a pourtant mauvaise réputation.",
+    items: [
+      { n: "Pizza surgelée", k: 260, up: true, emoji: "🍕", wiki: ["Frozen pizza", "Pizza"] },
+      { n: "Pâtes cuites", k: 150, up: false, emoji: "🍝", wiki: ["Pasta"] },
+      { n: "Riz cuit", k: 130, up: false, emoji: "🍚", wiki: ["Cooked rice", "Rice"] },
+      { n: "Pomme de terre à l'eau", k: 80, up: false, emoji: "🥔", wiki: ["Boiled potatoes", "Potato"] }
+    ]
+  },
+  {
+    title: "Le dessert lacté",
+    unit: "Pour 100 g",
+    expl: "La crème dessert, c'est du sucre, de l'amidon et de la crème. Le skyr apporte moitié moins de calories et environ 3 fois plus de protéines : parfait pour caler une fringale.",
+    items: [
+      { n: "Crème dessert vanille", k: 130, up: true, emoji: "🍮", wiki: ["fr:Crème dessert", "Pudding"] },
+      { n: "Yaourt nature", k: 50, up: false, emoji: "🥛", wiki: ["Yogurt"] },
+      { n: "Skyr nature", k: 60, up: false, emoji: "🥛", wiki: ["Skyr"] },
+      { n: "Fromage blanc 0 %", k: 45, up: false, emoji: "🥛", wiki: ["Fromage blanc"] }
+    ]
+  },
+  {
+    title: "Le snack « sport »",
+    unit: "Pour 100 g",
+    expl: "Une barre de céréales « fitness » est souvent un biscuit déguisé : sucres, sirop de glucose et huile. Un fruit rassasie mieux pour bien moins de calories.",
+    items: [
+      { n: "Barre de céréales", k: 420, up: true, emoji: "🍫", wiki: ["Granola bar"] },
+      { n: "Pain complet", k: 250, up: false, emoji: "🍞", wiki: ["Whole wheat bread"] },
+      { n: "Banane", k: 90, up: false, emoji: "🍌", wiki: ["Banana"] },
+      { n: "Pomme", k: 50, up: false, emoji: "🍎", wiki: ["Apple"] }
+    ]
+  },
+  {
+    title: "Les boissons",
+    unit: "Pour un verre de 25 cl",
+    expl: "Piège ! Le smoothie industriel a l'air sain, mais il est plus calorique que le coca. Sans fibres, le sucre du fruit se boit très vite et rassasie peu. Mieux vaut manger le fruit entier.",
+    items: [
+      { n: "Smoothie industriel", k: 150, up: true, emoji: "🥤", wiki: ["Smoothie"] },
+      { n: "Coca", k: 105, up: true, emoji: "🥤", wiki: ["Cola"] },
+      { n: "Lait demi-écrémé", k: 115, up: false, emoji: "🥛", wiki: ["Milk"] },
+      { n: "Jus d'orange pressé", k: 110, up: false, emoji: "🍊", wiki: ["Orange juice"] }
+    ]
+  },
+  {
+    title: "Le grignotage",
+    unit: "Pour 100 g",
+    expl: "Piège inverse : le plus calorique est ici l'aliment brut ! Les noix de macadamia sont très grasses. Les oléagineux sont bons pour la santé, mais en petite poignée de 20 à 30 g, pas au paquet.",
+    items: [
+      { n: "Noix de macadamia", k: 720, up: false, emoji: "🌰", wiki: ["Macadamia"] },
+      { n: "Chips", k: 540, up: true, emoji: "🥔", wiki: ["Potato chip"] },
+      { n: "Chocolat au lait", k: 540, up: true, emoji: "🍫", wiki: ["Milk chocolate"] },
+      { n: "Biscuits fourrés chocolat", k: 470, up: true, emoji: "🍪", wiki: ["Sandwich cookie"] }
+    ]
+  },
+  {
+    title: "Les sauces",
+    unit: "Pour 100 g",
+    expl: "Encore un piège inverse : l'huile d'olive est une bonne huile, mais c'est du gras pur (~90 kcal par cuillère à soupe). Elle se dose à la cuillère, pas « à l'œil ». Le ketchup est sucré, mais peu calorique.",
+    items: [
+      { n: "Huile d'olive", k: 900, up: false, emoji: "🫒", wiki: ["Olive oil"] },
+      { n: "Mayonnaise", k: 680, up: true, emoji: "🥚", wiki: ["Mayonnaise"] },
+      { n: "Sauce burger", k: 450, up: true, emoji: "🍔", wiki: ["Burger sauce", "Thousand Island dressing"] },
+      { n: "Ketchup", k: 110, up: true, emoji: "🍅", wiki: ["Ketchup"] }
+    ]
+  },
+  {
+    title: "Les produits de la mer",
+    unit: "Pour 100 g",
+    expl: "Le surimi est ultra-transformé mais peu calorique. Ce n'est pas un bon aliment pour autant (peu de protéines, des additifs) : ultra-transformé ne veut pas toujours dire calorique. Le saumon est un poisson gras, donc plus calorique, mais ce sont de bonnes graisses (oméga-3).",
+    items: [
+      { n: "Saumon fumé", k: 180, up: false, emoji: "🐟", wiki: ["Smoked salmon"] },
+      { n: "Surimi", k: 105, up: true, emoji: "🦀", wiki: ["Surimi", "Crab stick"] },
+      { n: "Crevettes", k: 95, up: false, emoji: "🦐", wiki: ["Shrimp and prawn as food", "Shrimp"] },
+      { n: "Cabillaud", k: 80, up: false, emoji: "🐟", wiki: ["Cod as food", "Atlantic cod"] }
+    ]
+  },
+
+  /* ============ PARTIE 2 : LE MOINS CALORIQUE ============ */
+  {
+    mode: "min",
+    title: "Les légumes",
+    unit: "Pour 100 g",
+    expl: "Le concombre est composé à plus de 95 % d'eau : c'est l'un des aliments les moins caloriques qui existent. Les petits pois et le maïs sont en réalité plus proches des féculents que des légumes verts.",
+    items: [
+      { n: "Concombre", k: 12, up: false, emoji: "🥒", wiki: ["Cucumber"] },
+      { n: "Carotte", k: 40, up: false, emoji: "🥕", wiki: ["Carrot"] },
+      { n: "Petits pois", k: 80, up: false, emoji: "🫛", wiki: ["Pea"] },
+      { n: "Maïs doux en conserve", k: 105, up: false, emoji: "🌽", wiki: ["Sweet corn"] }
+    ]
+  },
+  {
+    mode: "min",
+    title: "Les fruits",
+    unit: "Pour 100 g",
+    expl: "Les fruits rouges comme la fraise sont parmi les fruits les plus légers. La compote industrielle sucrée contient du sucre ajouté et moins de fibres qu'un fruit entier.",
+    items: [
+      { n: "Fraises", k: 32, up: false, emoji: "🍓", wiki: ["Strawberry"] },
+      { n: "Mangue", k: 65, up: false, emoji: "🥭", wiki: ["Mango"] },
+      { n: "Raisin", k: 70, up: false, emoji: "🍇", wiki: ["Grape"] },
+      { n: "Compote sucrée industrielle", k: 80, up: true, emoji: "🍏", wiki: ["Applesauce", "Apple sauce"] }
+    ]
+  },
+  {
+    mode: "min",
+    title: "Le petit-déjeuner",
+    unit: "Pour 100 g",
+    expl: "Piège : les biscottes ont l'air « light », mais c'est du pain déshydraté avec du sucre et de la matière grasse ajoutés. À poids égal, elles sont bien plus caloriques que la baguette.",
+    items: [
+      { n: "Baguette", k: 270, up: false, emoji: "🥖", wiki: ["Baguette"] },
+      { n: "Flocons d'avoine", k: 370, up: false, emoji: "🥣", wiki: ["Rolled oats", "Oatmeal"] },
+      { n: "Biscottes", k: 410, up: true, emoji: "🍞", wiki: ["fr:Biscotte", "Rusk"] },
+      { n: "Pain au chocolat", k: 420, up: true, emoji: "🥐", wiki: ["Pain au chocolat"] }
+    ]
+  },
+  {
+    mode: "min",
+    title: "La viande",
+    unit: "Pour 100 g",
+    expl: "L'escalope de dinde est l'une des viandes les plus maigres, avec beaucoup de protéines pour peu de calories. Le cordon bleu (pané et fourré) et la merguez (très grasse) sont 2 à 3 fois plus caloriques.",
+    items: [
+      { n: "Escalope de dinde", k: 105, up: false, emoji: "🦃", wiki: ["Turkey as food", "Turkey meat"] },
+      { n: "Côte de porc", k: 190, up: false, emoji: "🥩", wiki: ["Pork chop"] },
+      { n: "Cordon bleu", k: 240, up: true, emoji: "🍗", wiki: ["Cordon bleu (dish)"] },
+      { n: "Merguez", k: 300, up: true, emoji: "🌭", wiki: ["Merguez"] }
+    ]
+  },
+  {
+    mode: "min",
+    title: "Les fromages",
+    unit: "Pour 100 g",
+    expl: "Le cottage cheese est le fromage le plus léger, avec beaucoup de protéines. Les fromages à pâte dure comme l'emmental sont les plus caloriques, car ils contiennent moins d'eau.",
+    items: [
+      { n: "Cottage cheese", k: 100, up: false, emoji: "🧀", wiki: ["Cottage cheese"] },
+      { n: "Fromage fondu en portions", k: 240, up: true, emoji: "🧀", wiki: ["fr:Fromage fondu", "Processed cheese"] },
+      { n: "Mozzarella", k: 250, up: false, emoji: "🧀", wiki: ["Mozzarella"] },
+      { n: "Emmental", k: 380, up: false, emoji: "🧀", wiki: ["Emmental cheese", "Emmental"] }
+    ]
+  },
+  {
+    mode: "min",
+    title: "Les boissons",
+    unit: "Pour un verre de 25 cl",
+    expl: "Piège : le soda zéro est ultra-transformé, mais il n'apporte quasiment aucune calorie (édulcorants). Il ne nourrit pas pour autant, et l'eau reste la meilleure boisson. Le jus de pomme « 100 % naturel » est le plus calorique ici.",
+    items: [
+      { n: "Soda zéro", k: 1, up: true, emoji: "🥤", wiki: ["Diet soda", "Diet drink"] },
+      { n: "Thé glacé", k: 50, up: true, emoji: "🧋", wiki: ["Iced tea"] },
+      { n: "Lait d'amande sucré", k: 60, up: true, emoji: "🥛", wiki: ["Almond milk"] },
+      { n: "Jus de pomme", k: 115, up: false, emoji: "🧃", wiki: ["Apple juice"] }
+    ]
+  },
+  {
+    mode: "min",
+    title: "Le snack « light »",
+    unit: "Pour 100 g",
+    expl: "Piège : les galettes de riz soufflé ont une image très « régime », mais à 100 g elles sont aussi caloriques que des céréales. Elles paraissent légères parce qu'elles sont pleines d'air (~30 kcal la galette). Les edamames (fèves de soja) sont bien plus légers et riches en protéines.",
+    items: [
+      { n: "Edamame", k: 120, up: false, emoji: "🫛", wiki: ["Edamame"] },
+      { n: "Raisins secs", k: 300, up: false, emoji: "🍇", wiki: ["Raisin"] },
+      { n: "Galettes de riz soufflé", k: 385, up: true, emoji: "🍘", wiki: ["Puffed rice cakes", "Puffed rice"] },
+      { n: "Crackers salés", k: 450, up: true, emoji: "🧂", wiki: ["Cracker (food)"] }
+    ]
+  },
+  {
+    mode: "min",
+    title: "Le dessert",
+    unit: "Pour 100 g",
+    expl: "La salade de fruits frais est de loin la plus légère. Le sorbet est moins calorique que la glace (il ne contient pas de crème), mais c'est surtout du sucre.",
+    items: [
+      { n: "Salade de fruits frais", k: 55, up: false, emoji: "🍉", wiki: ["Fruit salad"] },
+      { n: "Sorbet", k: 120, up: true, emoji: "🍧", wiki: ["Sorbet"] },
+      { n: "Glace vanille", k: 200, up: true, emoji: "🍨", wiki: ["Ice cream"] },
+      { n: "Mousse au chocolat", k: 220, up: true, emoji: "🍫", wiki: ["Chocolate mousse", "Mousse"] }
+    ]
+  },
+  {
+    mode: "min",
+    title: "Les conserves de poisson",
+    unit: "Pour 100 g égoutté",
+    expl: "Le thon au naturel est une super source de protéines peu calorique. Le même thon conservé à l'huile apporte presque deux fois plus de calories. Lis toujours l'étiquette : « au naturel » plutôt que « à l'huile ».",
+    items: [
+      { n: "Thon au naturel", k: 115, up: false, emoji: "🐟", wiki: ["Canned tuna", "Tuna as food"] },
+      { n: "Thon à l'huile", k: 190, up: false, emoji: "🥫", wiki: ["Canned tuna", "Tuna as food"] },
+      { n: "Sardines à l'huile", k: 210, up: false, emoji: "🐟", wiki: ["Sardines as food", "Sardine"] },
+      { n: "Maquereau fumé", k: 230, up: false, emoji: "🐟", wiki: ["Mackerel as food", "Smoked mackerel"] }
+    ]
+  },
+  {
+    mode: "min",
+    title: "Les condiments",
+    unit: "Pour 100 g",
+    expl: "La sauce soja est très peu calorique, mais très salée : à utiliser avec modération. La vinaigrette et le pesto industriels sont surtout de l'huile, donc très caloriques. Une cuillère de moutarde est un bon compromis pour donner du goût.",
+    items: [
+      { n: "Sauce soja", k: 55, up: false, emoji: "🥢", wiki: ["Soy sauce"] },
+      { n: "Moutarde", k: 150, up: false, emoji: "🟡", wiki: ["Mustard (condiment)"] },
+      { n: "Vinaigrette industrielle", k: 450, up: true, emoji: "🥗", wiki: ["Vinaigrette"] },
+      { n: "Pesto industriel", k: 480, up: true, emoji: "🌿", wiki: ["Pesto"] }
+    ]
+  }
+];
+const PART2_START = QUESTIONS.findIndex(q => q.mode === "min");
+
+/* ---------------- Images depuis Wikipédia ---------------- */
+const IMG = {}; // "lang:Titre" -> {src, file}
+
+async function fetchImages(){
+  const byLang = {};
+  QUESTIONS.forEach(q => q.items.forEach(it => it.wiki.forEach(w => {
+    const [lang, title] = w.startsWith("fr:") ? ["fr", w.slice(3)] : ["en", w];
+    (byLang[lang] = byLang[lang] || new Set()).add(title);
+  })));
+  const jobs = [];
+  for (const lang in byLang){
+    const titles = [...byLang[lang]];
+    for (let i = 0; i < titles.length; i += 45){
+      jobs.push(fetchBatch(lang, titles.slice(i, i + 45)));
+    }
+  }
+  await Promise.allSettled(jobs);
+}
+
+async function fetchBatch(lang, titles){
+  const url = `https://${lang}.wikipedia.org/w/api.php?action=query&format=json&origin=*`
+    + `&prop=pageimages&piprop=thumbnail|name&pithumbsize=500&redirects=1`
+    + `&titles=${encodeURIComponent(titles.join("|"))}`;
+  const res = await fetch(url);
+  const data = await res.json();
+  const q = data.query || {};
+  // Remonter du titre final vers le titre demandé (normalisation + redirections)
+  const back = {};
+  (q.normalized || []).forEach(x => back[x.to] = x.from);
+  (q.redirects || []).forEach(x => back[x.to] = back[x.from] || x.from);
+  Object.values(q.pages || {}).forEach(p => {
+    if (!p.thumbnail) return;
+    const requested = back[p.title] || p.title;
+    const info = { src: p.thumbnail.source, file: p.pageimage };
+    IMG[lang + ":" + requested] = info;
+    IMG[lang + ":" + p.title] = info;
+  });
+}
+
+function imageFor(item){
+  for (const w of item.wiki){
+    const key = w.startsWith("fr:") ? w : "en:" + w;
+    if (IMG[key]) return IMG[key];
+  }
+  return null;
+}
+
+/* ---------------- Logique du quiz ---------------- */
+const app = document.getElementById("app");
+const scoreEl = document.getElementById("score");
+const barEl = document.getElementById("bar");
+let idx = 0, score = 0, answers = [], imagesReady;
+
+function shuffle(a){ a = a.slice(); for (let i = a.length - 1; i > 0; i--){ const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+const tagHTML = up => up ? '<span class="tag up">🏭 ultra-transformé</span>' : '<span class="tag raw">🌱 brut</span>';
+
+function updateHeader(){
+  scoreEl.textContent = idx < QUESTIONS.length || answers.length ? `Score : ${score}/${answers.length}` : "";
+  barEl.style.width = (answers.length / QUESTIONS.length * 100) + "%";
+}
+
+function renderStart(){
+  scoreEl.textContent = "";
+  barEl.style.width = "0";
+  app.innerHTML = `
+    <div class="card center">
+      <div class="big">🔥</div>
+      <h2>Le quiz des calories</h2>
+      <p class="unit">${QUESTIONS.length} questions en 2 parties, avec 4 aliments à chaque fois.<br>
+      <strong>Partie 1 :</strong> trouve le <strong>plus</strong> calorique. <strong>Partie 2 :</strong> trouve le <strong>moins</strong> calorique.<br>
+      Attention aux pièges : un aliment « healthy » n'est pas toujours léger, et un aliment industriel n'est pas toujours le plus calorique.</p>
+      <div class="legend">${tagHTML(true)} ${tagHTML(false)}</div>
+      <button class="btn" id="go">C'est parti !</button>
+    </div>`;
+  document.getElementById("go").onclick = () => { idx = 0; score = 0; answers = []; renderQuestion(); };
+}
+
+function renderQuestion(){
+  updateHeader();
+  const q = QUESTIONS[idx];
+  const items = shuffle(q.items);
+  const isMin = q.mode === "min";
+  const maxK = isMin ? Math.min(...q.items.map(i => i.k)) : Math.max(...q.items.map(i => i.k));
+  app.innerHTML = `
+    <div class="card">
+      <p class="qnum">Question ${idx + 1} / ${QUESTIONS.length} · ${isMin ? "Partie 2 : le moins calorique" : "Partie 1 : le plus calorique"}</p>
+      <h2>${q.title}</h2>
+      <p class="unit">${q.unit} : lequel est le <strong class="${isMin ? "kw-min" : "kw-max"}">${isMin ? "MOINS" : "PLUS"} calorique</strong> ?</p>
+      <div class="choices" id="choices">
+        ${items.map((it, i) => `
+          <button class="choice" data-i="${i}">
+            <div class="imgbox" data-img="${i}">${it.emoji}</div>
+            <div class="cname"><span>${it.n}</span><span class="kcal">${it.k} kcal</span></div>
+          </button>`).join("")}
+      </div>
+      <div class="verdict" id="verdict"></div>
+      <div class="feedback" id="feedback"></div>
+    </div>`;
+
+  const paint = () => items.forEach((it, i) => {
+    const info = imageFor(it);
+    if (!info) return;
+    const box = app.querySelector(`[data-img="${i}"]`);
+    if (!box) return;
+    const im = new Image();
+    im.onload = () => { box.style.backgroundImage = `url("${info.src}")`; box.textContent = ""; };
+    im.src = info.src;
+    box.dataset.file = info.file || "";
+  });
+  imagesReady.then(paint);
+
+  app.querySelectorAll(".choice").forEach(btn => {
+    btn.onclick = () => answer(items, +btn.dataset.i, maxK);
+  });
+}
+
+function answer(items, chosen, maxK){
+  const q = QUESTIONS[idx];
+  const ok = items[chosen].k === maxK;
+  if (ok) score++;
+  answers.push({ q: q.title, ok, chosen: items[chosen].n, right: items.find(i => i.k === maxK).n });
+  updateHeader();
+
+  const box = document.getElementById("choices");
+  box.classList.add("revealed");
+  box.querySelectorAll(".choice").forEach((btn, i) => {
+    btn.disabled = true;
+    if (items[i].k === maxK) btn.classList.add("correct");
+    else if (i === chosen) btn.classList.add("wrong");
+    else btn.classList.add("dim");
+    const f = btn.querySelector(".imgbox").dataset.file;
+    if (f){
+      btn.disabled = false;
+      btn.onclick = () => window.open("https://commons.wikimedia.org/wiki/File:" + encodeURIComponent(f), "_blank", "noopener");
+      btn.title = "Voir la source de la photo";
+    }
+  });
+
+  const v = document.getElementById("verdict");
+  v.className = "verdict " + (ok ? "good" : "bad");
+  v.textContent = ok ? "✅ Bonne réponse !" : `❌ Raté ! C'était : ${items.find(i => i.k === maxK).n}`;
+
+  const isMin = q.mode === "min";
+  const ranked = q.items.slice().sort((a, b) => isMin ? a.k - b.k : b.k - a.k);
+  const topK = Math.max(...q.items.map(i => i.k));
+  const fb = document.getElementById("feedback");
+  fb.innerHTML = `
+    <p class="expl">💡 ${q.expl}</p>
+    <div class="rank">
+      <h3>Classement du ${isMin ? "moins" : "plus"} au ${isMin ? "plus" : "moins"} calorique (${q.unit.toLowerCase()})</h3>
+      ${ranked.map((it, i) => `
+        <div class="bar ${i === 0 ? (isMin ? "first low" : "first") : ""}">
+          <span class="pos">${i + 1}</span>
+          <div class="track">
+            <div class="fill" style="width:0" data-w="${Math.max(8, it.k / topK * 100)}"></div>
+            <div class="lbl">${it.n} · ${it.k} kcal ${tagHTML(it.up)}</div>
+          </div>
+        </div>`).join("")}
+    </div>
+    <button class="btn" id="next">${idx + 1 < QUESTIONS.length ? "Question suivante →" : "Voir mon résultat"}</button>`;
+  fb.classList.add("show");
+  requestAnimationFrame(() => fb.querySelectorAll(".fill").forEach(f => f.style.width = f.dataset.w + "%"));
+  document.getElementById("next").onclick = () => {
+    idx++;
+    if (idx === PART2_START) renderTransition();
+    else idx < QUESTIONS.length ? renderQuestion() : renderEnd();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+  v.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+function renderTransition(){
+  updateHeader();
+  app.innerHTML = `
+    <div class="card center">
+      <div class="big">🔄</div>
+      <h2>Partie 2 : on inverse !</h2>
+      <p class="unit">Fin de la partie 1 : ${score} / ${PART2_START}.<br><br>
+      Maintenant, trouve l'aliment le <strong class="kw-min">MOINS calorique</strong>.<br>
+      Méfie-toi encore des aliments qui ont l'air « light »…</p>
+      <button class="btn" id="go2">Continuer →</button>
+    </div>`;
+  document.getElementById("go2").onclick = renderQuestion;
+}
+
+function renderEnd(){
+  updateHeader();
+  const pct = score / QUESTIONS.length;
+  const msg = pct >= .8 ? ["🏆", "Expert ! Tu ne te fais pas avoir par les pièges."]
+            : pct >= .5 ? ["👍", "Pas mal ! Quelques pièges t'ont eu, relis les explications."]
+            : ["📚", "Les apparences sont trompeuses… Refais le quiz pour bien retenir !"];
+  app.innerHTML = `
+    <div class="card center">
+      <div class="big">${msg[0]}</div>
+      <h2>${score} / ${QUESTIONS.length}</h2>
+      <p class="unit">${msg[1]}</p>
+      <ul class="recap">
+        ${answers.map((a, i) => `<li>${a.ok ? "✅" : "❌"} <strong>${i + 1}. ${a.q}</strong>${a.ok ? "" : ` · tu as choisi ${a.chosen}, c'était ${a.right}`}</li>`).join("")}
+      </ul>
+      <div class="takeaway">
+        <strong>À retenir</strong><br>
+        • La plupart des ultra-transformés 🏭 concentrent beaucoup de calories dans peu de volume et rassasient mal.<br>
+        • Mais le brut 🌱 n'est pas toujours léger : huiles, oléagineux et poissons gras se dosent.<br>
+        • Méfie-toi des produits « light » (biscottes, galettes de riz) et lis les étiquettes (thon au naturel plutôt qu'à l'huile).<br>
+        • Aliments peu caloriques à ajouter : poisson blanc, thon au naturel, blanc de poulet ou de dinde, cottage cheese, skyr ou fromage blanc 0 %, pomme de terre à l'eau, edamame, fruits entiers (fraises), légumes à volonté (concombre).
+      </div>
+      <button class="btn" id="again">Rejouer 🔁</button>
+    </div>`;
+  document.getElementById("again").onclick = renderStart;
+}
+
+imagesReady = fetchImages().catch(() => {});
+renderStart();
+</script>
+</body>
+</html>
